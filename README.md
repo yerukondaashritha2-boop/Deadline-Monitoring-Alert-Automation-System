@@ -271,7 +271,7 @@ Ready to automate deadline monitoring?
 **Status:** Open to collaboration & freelance automation gigs!
 
 ---
-## ❤️ power by  Yerukonda Ashritha/R
+## ❤️ power by  Ashu/Ramu
 
 
 ---
