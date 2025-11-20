@@ -1,0 +1,261 @@
+{
+  "name": "User Deadline Monitoring & Alert Automation System",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f1994e7b-2116-4228-a006-2dc6aa171253",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "B3A6xnJ61wMJCdZf",
+          "mode": "list",
+          "cachedResultName": "local_data_table_sample"
+        }
+      },
+      "id": "acce0524-e63b-4130-ba84-1a8bae4b0be5",
+      "name": "Get All Users",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "fa788d7d-fd9d-44f3-9c08-b569786c0241",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "hotel_entries"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -64
+      ],
+      "id": "7d3169e0-8308-4b6b-9a46-b43879bc5d1f",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "id": "qWbY76hLVfKmiNSi",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get user data from Split In Batches node\nconst user = $input.first().json;\n\n// Get all submissions from Get many rows node  \nconst allSubmissions = $input.last().json;\n\n// Extract user fields (with fallbacks for different naming patterns)\nconst user_id = user.user_id || user.id || null;\nconst user_name = user.user_name || user.name || null;\nconst telegram_chat_id = user.telegram_chat_id || null;\nconst allowed_time = user.allowed_time || null;\nconst email = user.email || null;\nconst phone = user.phone || null;\n\n// Initialize result variables\nlet latest_submitted_at = null;\nlet alert = false;\nlet alert_reason = \"No submission found before deadline\";\n\n// Process submissions if they exist\nif (allSubmissions && Array.isArray(allSubmissions) && allSubmissions.length > 0) {\n    // Filter to get only this user's submissions (match by user_name)\n    const userSubmissions = allSubmissions.filter(submission => {\n        return submission.user_name && user_name && \n               submission.user_name.toLowerCase().trim() === user_name.toLowerCase().trim();\n    });\n    \n    if (userSubmissions.length > 0) {\n        // Sort by inserted_at (latest first)\n        const sortedSubmissions = userSubmissions\n            .filter(s => s.inserted_at)\n            .sort((a, b) => new Date(b.inserted_at) - new Date(a.inserted_at));\n        \n        if (sortedSubmissions.length > 0) {\n            // Get latest submission time\n            latest_submitted_at = sortedSubmissions[0].inserted_at;\n            \n            // Compare with deadline if it exists\n            if (allowed_time) {\n                const submissionDate = new Date(latest_submitted_at);\n                const deadlineDate = new Date(allowed_time);\n                \n                if (submissionDate > deadlineDate) {\n                    // Late submission\n                    alert = true;\n                    const diffMs = submissionDate - deadlineDate;\n                    const hours = Math.floor(diffMs / (1000 * 60 * 60));\n                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));\n                    alert_reason = `Late by ${hours}h ${minutes}m. Deadline: ${allowed_time}`;\n                } else {\n                    // On-time submission\n                    alert = false;\n                    const diffMs = deadlineDate - submissionDate;\n                    const hours = Math.floor(diffMs / (1000 * 60 * 60));\n                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));\n                    alert_reason = `Submitted on time (${hours}h ${minutes}m early)`;\n                }\n            } else {\n                alert = false;\n                alert_reason = \"Submission exists but no deadline set\";\n            }\n        }\n    } else {\n        alert = true;\n        alert_reason = `No submission found for ${user_name}`;\n    }\n} else {\n    alert = true;\n    alert_reason = \"No submissions found in database\";\n}\n\n// Return all data\nreturn {\n    user_id: user_id,\n    user_name: user_name,\n    email: email,\n    phone: phone,\n    telegram_chat_id: telegram_chat_id,\n    allowed_time: allowed_time,\n    latest_submitted_at: latest_submitted_at,\n    alert: alert,\n    alert_reason: alert_reason\n};\n"
+      },
+      "id": "2e6e0be4-011d-41f2-bd20-eabe988d0a0b",
+      "name": "Compare Timestamps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.alert }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "37ba5075-f7e8-49f9-828d-238fe9ecaa5e",
+      "name": "IF Alert",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegram_chat_id }}",
+        "text": "=Hi {{ $json.user_name }}\n\nYou have not submitted your research report before the deadline.\n\nDeadline: {{ $json.allowed_time }}\nReason: {{ $json.alert_reason }}\n\nYour data is still being entered. Please visit this link as soon as possible and upload it:\nhttps://jeyaram1023.github.io/Department-News-Portal/\n\nPlease submit as soon as possible.\n\nBest regards,\nDeadline Monitoring Bot\nUser ID: {{ $json.user_id }}\n",
+        "additionalFields": {}
+      },
+      "id": "9b5ed7b0-2184-4074-87c1-1aadbdfccb83",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        624,
+        -160
+      ],
+      "webhookId": "ce0cd38c-ae34-45c7-852c-a0996f30924f",
+      "credentials": {
+        "telegramApi": {
+          "id": "uSzxkOKMoq6PEwVK",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "7ac97d05-4901-4929-b210-b87a789b7728",
+      "name": "No Operation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        624,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## User Deadline Monitoring & Alert Automation System \n**A fully automated system that tracks user submission deadlines and instantly sends Telegram alerts for missed reports.** [Live Portal:](https://jeyaram1023.github.io/Department-News-Portal/)\n [GITHUB.COM ](https://github.com/jeyaram1023/Deadline-Monitoring-Alert-Automation-System.git)\n",
+        "height": 112,
+        "width": 624,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -160,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "60fdd956-9c3c-4aa5-a379-38a46e593a82",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get All Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Users": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compare Timestamps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Timestamps": {
+      "main": [
+        [
+          {
+            "node": "IF Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "47e03ab8-242c-4cc5-a573-32185af8965a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "95a26cccc9ac346c9b70f09f8b7861ff72ec43797c08eea1a425b29f0e32871f"
+  },
+  "id": "tq4xWcJpt9ZkZoua",
+  "tags": [
+    {
+      "name": "User Deadline",
+      "id": "uqEkPtTxer404r53",
+      "updatedAt": "2025-11-19T18:22:33.837Z",
+      "createdAt": "2025-11-19T18:22:33.837Z"
+    }
+  ]
+}
