@@ -259,16 +259,19 @@ Ready to automate deadline monitoring?
 
 ## 👨‍💻 About the Developer
 
-**Name:** Jeyaram Reddy  
-**Email:** jeyaram.reddy.ece@gmail.com  
-**GitHub:** [jeyaram1023](https://github.com/jeyaram1023)  
-**LinkedIn:** [Jeyaram B](https://www.linkedin.com/in/jeyaram-ece-reddy)  
+**Name:** Yerukonda Ashritha   
+
+**Email:** yerukondaashritha2@gmail.com   
+
+**GitHub:** [yerukondaashritha2-boop](https://github.com/yerukondaashritha2-boop)   
+**LinkedIn:** [Ashritha Yerukonda](https://www.linkedin.com/in/ashritha-yerukonda-3093b3325)  
 **Portfolio**[Click here](https://jeyaram1023.github.io/My-portfolio/).
 
 **Location:** India  
 **Status:** Open to collaboration & freelance automation gigs!
 
 ---
+## ❤️ power by  Yerukonda Ashritha/R
 
 
-
+---
